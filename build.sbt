@@ -269,6 +269,22 @@ lazy val sparqlClient = project
     )
   )
 
+lazy val forwardClient = project
+  .in(file("modules/forward-client"))
+  .dependsOn(http, queryTypes, test % Test)
+  .settings(
+    name       := "forward-client",
+    moduleName := "forward-client",
+    organization := "hbp.kg.nexus",
+    version    := "1.0.0",
+    libraryDependencies ++= Seq(
+      akkaStream,
+      circeCore,
+      circeParser        % Test,
+      circeGenericExtras % Test
+    )
+  )
+
 lazy val shaclValidator = project
   .in(file("modules/ld/shacl-validator"))
   .dependsOn(types)
@@ -302,6 +318,7 @@ lazy val root = project
              elasticServerEmbed,
              elasticClient,
              sparqlClient,
+             forwardClient,
              shaclValidator,
              iam,
              schemas)
@@ -321,7 +338,8 @@ inThisBuild(
       Developer("bogdanromanx", "Bogdan Roman", "noreply@epfl.ch", url("https://bluebrain.epfl.ch/")),
       Developer("hygt", "Henry Genet", "noreply@epfl.ch", url("https://bluebrain.epfl.ch/")),
       Developer("umbreak", "Didac Montero Mendez", "noreply@epfl.ch", url("https://bluebrain.epfl.ch/")),
-      Developer("wwajerowicz", "Wojtek Wajerowicz", "noreply@epfl.ch", url("https://bluebrain.epfl.ch/"))
+      Developer("wwajerowicz", "Wojtek Wajerowicz", "noreply@epfl.ch", url("https://bluebrain.epfl.ch/")),
+      Developer("rdiana", "Remi Diana", "remi.diana@gmail.com", url("https://bluebrain.epfl.ch/"))
     ),
     // These are the sbt-release-early settings to configure
     releaseEarlyWith              := BintrayPublisher,
