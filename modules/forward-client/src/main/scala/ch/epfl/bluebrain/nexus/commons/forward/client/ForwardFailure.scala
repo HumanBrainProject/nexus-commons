@@ -1,6 +1,6 @@
 package ch.epfl.bluebrain.nexus.commons.forward.client
 
-//import akka.http.scaladsl.model.StatusCodes.{ClientError, ServerError}
+import akka.http.scaladsl.model.StatusCodes.{ClientError, ServerError}
 import akka.http.scaladsl.model.{HttpResponse, StatusCode}
 import cats.MonadError
 import cats.syntax.functor._
@@ -30,21 +30,53 @@ object ForwardFailure {
 
 
   /**
-    * Generates a ElasticSearch server failure from the HTTP response status ''code''.
+    * Generates a Forward server failure from the HTTP response status ''code''.
     *
     * @param code the HTTP response status ''code''
     * @param body the HTTP response payload
     */
   def fromStatusCode(code: StatusCode, body: String): ForwardFailure =
     code match {
-      case _              => ForwardError(code, body)
+      case _: ServerError => ForwardServerError(code, body)
+      case _: ClientError => ForwardClientError(code, body)
+      case _              => ForwardUnexpectedError(code, body)
     }
 
   /**
-    * An unexpected failure when attempting to communicate with a ElasticSearch endpoint.
+    * An unexpected server failure when attempting to communicate with a Forward endpoint.
     *
-    * @param status the status returned by the ElasticSearch endpoint
-    * @param body   the response body returned by the ElasticSearch endpoint
+    * @param status the status returned by the Forward endpoint
+    * @param body   the response body returned by the Forward endpoint
+    */
+  final case class ForwardServerError(status: StatusCode, body: String)
+    extends RetriableErr(s"Server error with status code '$status'")
+      with ForwardFailure
+
+  /**
+    * An unexpected client failure when attempting to communicate with a Forward endpoint.
+    *
+    * @param status the status returned by the Forward endpoint
+    * @param body   the response body returned by the Forward endpoint
+    */
+  final case class ForwardClientError(status: StatusCode, body: String)
+    extends Err(s"Client error with status code '$status'")
+      with ForwardFailure
+
+  /**
+    * An unexpected failure when attempting to communicate with a Forward endpoint.
+    *
+    * @param status the status returned by the Forward endpoint
+    * @param body   the response body returned by the Forward endpoint
+    */
+  final case class ForwardUnexpectedError(status: StatusCode, body: String)
+    extends RetriableErr(s"Unexpected error with status code '$status'")
+      with ForwardFailure
+
+  /**
+    * An unexpected failure when attempting to communicate with a Forward endpoint.
+    *
+    * @param status the status returned by the Forward endpoint
+    * @param body   the response body returned by the Forward endpoint
     */
   final case class ForwardError(status: StatusCode, body: String)
     extends RetriableErr(s"Unexpected error with status code '$status'")
