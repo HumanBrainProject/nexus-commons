@@ -37,10 +37,12 @@ class ForwardClient[F[_]](base: Uri)(implicit
     *                  properly. It is not interpreted by the forward client
     * @param payload the document's payload
     */
-  def create(fullId: String, payload: Json): F[Unit] = {
-    val uri = base.copy(path = base.path ++ Path(fullId))
+  def create(fullId: String, payload: Json, authorIdOpt: Option[String] = None, eventDateTimeOpt: Option[String] = None): F[Unit] = {
+    val queryParameters = Map( "authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt)
+      .collect{ case (key, Some(value)) => (key, value)}
+    val uri = base.copy(path = base.path ++ Path(fullId)).withQuery(Query(queryParameters))
+
     log.info(s"forward client - creation id: ${fullId}")
-    // TODO format payload to a creation payload according to api
     execute(Post(uri, payload), Set(OK, Created), "forward creation")
   }
 
@@ -51,10 +53,12 @@ class ForwardClient[F[_]](base: Uri)(implicit
     *                  properly. It is not interpreted by the forward client
     * @param payload   the document's payload
     */
-  def update(fullId: String, payload: Json): F[Unit] = {
-    val uri = base.copy(path = base.path ++ Path(fullId))
+  def update(fullId: String, payload: Json, authorIdOpt: Option[String] = None, eventDateTimeOpt: Option[String] = None): F[Unit] = {
+    val queryParameters = Map( "authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt)
+      .collect{ case (key, Some(value)) => (key, value)}
+    val uri = base.copy(path = base.path ++ Path(fullId)).withQuery(Query(queryParameters))
+
     log.info(s"forward client - update id: ${fullId}")
-    // TODO format payload to an update payload according to api
     execute(Put(uri, payload), Set(OK), "forward update")
   }
 
@@ -64,12 +68,12 @@ class ForwardClient[F[_]](base: Uri)(implicit
     * @param fullId    the full id of the document to update (may contain path and rev). Up to the caller to format it
     *                  properly. It is not interpreted by the forward client
     */
-  def delete(fullId: String, rev: Option[String] = None): F[Unit] = {
+  def delete(fullId: String, revOpt: Option[String] = None, authorIdOpt: Option[String] = None, eventDateTimeOpt: Option[String] = None): F[Unit] = {
+    val queryParameters = Map( "authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt, "rev" -> revOpt)
+        .collect{ case (key, Some(value)) => (key, value)}
+    val uri =  base.copy(path = base.path ++ Path(fullId)).withQuery(Query(queryParameters))
+
     log.info(s"forward client - creation id: ${fullId}")
-    val uri = rev match {
-      case Some(revision) => base.copy(path = base.path ++ Path(fullId)).withQuery(Query(("rev" -> revision)))
-      case None => base.copy(path = base.path ++ Path(fullId))
-    }
     execute(Delete(uri), Set(OK), "forward delete")
   }
 
@@ -79,8 +83,8 @@ class ForwardClient[F[_]](base: Uri)(implicit
     * @param fullId      the id of the document to fetch
     */
   def get[A](fullId: String)(implicit rs: HttpClient[F, A]): F[A] = {
+    log.info(s"forward client - get id: ${fullId}")
     val uri = base.copy(path = base.path ++ Path(fullId))
-    // TODO format payload to a get payload according to api
     rs(Get(uri)).recoverWith {
       case UnexpectedUnsuccessfulHttpResponse(r) => ForwardFailure.fromResponse(r).flatMap(F.raiseError)
       case other => F.raiseError(other)
