@@ -164,7 +164,7 @@ lazy val forwardClient = project
     name       := "forward-client",
     moduleName := "forward-client",
     organization := "hbp.kg.nexus",
-    version    := "1.0.0",
+    version    := "0.10.19",
     libraryDependencies ++= Seq(
       akkaStream,
       circeCore,
