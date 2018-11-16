@@ -134,6 +134,7 @@ lazy val elasticClient = project
     )
   )
 
+
 lazy val sparqlClient = project
   .in(file("modules/sparql-client"))
   .dependsOn(http, queryTypes, test % Test)
@@ -155,6 +156,23 @@ lazy val sparqlClient = project
       scalaTest          % Test
     )
   )
+
+lazy val forwardClient = project
+  .in(file("modules/forward-client"))
+  .dependsOn(http, queryTypes, test % Test)
+  .settings(
+    name       := "forward-client",
+    moduleName := "forward-client",
+    organization := "hbp.kg.nexus",
+    version    := "1.0.0",
+    libraryDependencies ++= Seq(
+      akkaStream,
+      circeCore,
+      circeParser        % Test,
+      circeGenericExtras % Test
+    )
+  )
+
 
 lazy val shaclValidator = project
   .in(file("modules/ld/shacl-validator"))
