@@ -3,8 +3,9 @@ package ch.epfl.bluebrain.nexus.commons.es.client
 import akka.http.scaladsl.model.{HttpRequest, StatusCode}
 import cats.MonadError
 import cats.syntax.flatMap._
+import cats.syntax.functor._
 import ch.epfl.bluebrain.nexus.commons.es.client.ElasticBaseClient._
-import ch.epfl.bluebrain.nexus.commons.http.HttpClient.{HttpResponseSyntax, UntypedHttpClient}
+import ch.epfl.bluebrain.nexus.commons.http.HttpClient.UntypedHttpClient
 import journal.Logger
 
 /**
@@ -17,25 +18,41 @@ abstract class ElasticBaseClient[F[_]](implicit
                                        F: MonadError[F, Throwable]) {
   private[client] val log = Logger[this.type]
 
-  private[client] def execute(req: HttpRequest, expectedCodes: Set[StatusCode]): F[Unit] =
-    executeWith(req, expectedCodes, None)
+  private[client] def execute(req: HttpRequest, expectedCodes: Set[StatusCode], intent: String): F[Unit] =
+    execute(req, expectedCodes, Set.empty, intent).map(_ => ())
 
-  private[client] def execute(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => String): F[Unit] =
-    executeWith(req, expectedCodes, Some(intent))
-
-  private def executeWith(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => Option[String]): F[Unit] =
-    cl(req).discardOnCodesOr(expectedCodes) { resp =>
-      ElasticFailure.fromResponse(resp).flatMap { f =>
-        val _ = intent.map(msg =>
-          log.error(
-            s"Unexpected ElasticSearch response for intent '$msg':\nRequest: '${req.method} ${req.uri}'\nStatus: '${resp.status}'\nResponse: '${f.body}'"))
-        F.raiseError(f)
-      }
+  private[client] def execute(req: HttpRequest,
+                              expectedCodes: Set[StatusCode],
+                              ignoredCodes: Set[StatusCode],
+                              intent: String): F[Boolean] =
+    cl(req).flatMap { resp =>
+      if (expectedCodes.contains(resp.status)) cl.discardBytes(resp.entity).map(_ => true)
+      else if (ignoredCodes.contains(resp.status)) cl.discardBytes(resp.entity).map(_ => false)
+      else
+        ElasticFailure.fromResponse(resp).flatMap { f =>
+          cl.toString(req.entity).flatMap { reqBody =>
+            log.error(
+              s"Unexpected ElasticSearch response for intent '$intent':\nRequest: '${req.method} ${req.uri}' \nBody: '$reqBody'\nStatus: '${resp.status}'\nResponse: '${f.body}'")
+            F.raiseError(f)
+          }
+        }
     }
 
-  private[client] def indexPath(indices: Set[String]) =
+  private[client] def indexPath(indices: Set[String]): String =
     if (indices.isEmpty) anyIndexPath
-    else indices.mkString(",")
+    else indices.map(sanitize(_, allowWildCard = true)).mkString(",")
+
+  /**
+    * Replaces the characters ' "\<>|,/?' in the provided index with '_' and drops all '_' prefixes.
+    * The wildcard (*) character will be only dropped when ''allowWildCard'' is set to false.
+    *
+    * @param index the index name to sanitize
+    * @param allowWildCard flag to allow wildcard (*) or not.
+    */
+  private[client] def sanitize(index: String, allowWildCard: Boolean = false): String = {
+    val regex = if (allowWildCard) """[\s|"|\\|<|>|\||,|/|?]""" else """[\s|"|*|\\|<|>|\||,|/|?]"""
+    index.replaceAll(regex, "_").dropWhile(_ == '_')
+  }
 }
 
 object ElasticBaseClient {

@@ -1,20 +1,21 @@
 val wesoValidatorVersion = "0.0.65-nexus1"
-val jenaVersion          = "3.7.0"
+val jenaVersion          = "3.9.0"
 val blazegraphVersion    = "2.1.4"
-val jacksonVersion       = "2.9.6"
-val catsVersion          = "1.1.0"
-val circeVersion         = "0.9.3"
+val jacksonVersion       = "2.9.7"
+val catsVersion          = "1.4.0"
+val circeVersion         = "0.10.1"
 val scalaTestVersion     = "3.0.5"
 val shapelessVersion     = "2.3.3"
 val journalVersion       = "3.0.19"
-val akkaVersion          = "2.5.13"
-val akkaHttpVersion      = "10.0.13"
-val akkaHttpCirceVersion = "1.21.0"
-val elasticSearchVersion = "6.3.0"
-val log4jVersion         = "2.11.0"
+val akkaVersion          = "2.5.18"
+val akkaHttpVersion      = "10.1.5"
+val akkaHttpCirceVersion = "1.22.0"
+val elasticSearchVersion = "6.4.3"
+val log4jVersion         = "2.11.1"
 val commonsIOVersion     = "1.3.2"
-val rdfVersion           = "0.2.0"
+val rdfVersion           = "0.2.26"
 val monixVersion         = "3.0.0-RC1"
+val topQuadrantVersion   = "1.2.0-nexus3"
 
 lazy val catsCore           = "org.typelevel"                   %% "cats-core"            % catsVersion
 lazy val circeCore          = "io.circe"                        %% "circe-core"           % circeVersion
@@ -41,16 +42,18 @@ lazy val akkaHttpTestKit = "com.typesafe.akka" %% "akka-http-testkit" % akkaHttp
 lazy val akkaHttpCirce   = "de.heikoseeberger" %% "akka-http-circe"   % akkaHttpCirceVersion
 lazy val akkaHttpCore    = "com.typesafe.akka" %% "akka-http-core"    % akkaHttpVersion
 
-lazy val log4jCore         = "org.apache.logging.log4j"          % "log4j-core"                % log4jVersion
-lazy val log4jApi          = "org.apache.logging.log4j"          % "log4j-api"                 % log4jVersion
-lazy val esCore            = "org.elasticsearch"                 % "elasticsearch"             % elasticSearchVersion
-lazy val esPainless        = "org.codelibs.elasticsearch.module" % "lang-painless"             % elasticSearchVersion
-lazy val esReindex         = "org.codelibs.elasticsearch.module" % "reindex"                   % elasticSearchVersion
-lazy val esRestClient      = "org.elasticsearch.client"          % "elasticsearch-rest-client" % elasticSearchVersion
-lazy val esTransportClient = "org.elasticsearch.plugin"          % "transport-netty4-client"   % elasticSearchVersion
-lazy val commonsIO         = "org.apache.commons"                % "commons-io"                % commonsIOVersion
-lazy val monixTail         = "io.monix"                          %% "monix-tail"               % monixVersion
-lazy val rdfJena           = "ch.epfl.bluebrain.nexus"           %% "rdf-jena"                 % rdfVersion
+lazy val log4jCore         = "org.apache.logging.log4j"             % "log4j-core"                % log4jVersion
+lazy val log4jApi          = "org.apache.logging.log4j"             % "log4j-api"                 % log4jVersion
+lazy val esCore            = "org.elasticsearch"                    % "elasticsearch"             % elasticSearchVersion
+lazy val esPainless        = "org.codelibs.elasticsearch.module"    % "lang-painless"             % elasticSearchVersion
+lazy val esReindex         = "org.codelibs.elasticsearch.module"    % "reindex"                   % elasticSearchVersion
+lazy val esRestClient      = "org.elasticsearch.client"             % "elasticsearch-rest-client" % elasticSearchVersion
+lazy val esTransportClient = "org.elasticsearch.plugin"             % "transport-netty4-client"   % elasticSearchVersion
+lazy val commonsIO         = "org.apache.commons"                   % "commons-io"                % commonsIOVersion
+lazy val monixTail         = "io.monix"                             %% "monix-tail"               % monixVersion
+lazy val rdfJena           = "ch.epfl.bluebrain.nexus"              %% "rdf-jena"                 % rdfVersion
+lazy val rdfCirce          = "ch.epfl.bluebrain.nexus"              %% "rdf-circe"                % rdfVersion
+lazy val topQuadrantShacl  = "ch.epfl.bluebrain.nexus.org.topbraid" % "shacl"                     % topQuadrantVersion
 
 lazy val types = project
   .in(file("modules/types"))
@@ -178,13 +181,29 @@ lazy val shaclValidator = project
   .in(file("modules/ld/shacl-validator"))
   .dependsOn(types)
   .settings(
-    name       := "shacl-validator",
-    moduleName := "shacl-validator",
+    name       := "shacl-shaclex-validator",
+    moduleName := "shacl-shaclex-validator",
     resolvers  += Resolver.bintrayRepo("bogdanromanx", "maven"),
     libraryDependencies ++= Seq(journal,
                                 wesoSchema,
                                 catsCore,
                                 circeCore,
+                                akkaSlf4j   % Test,
+                                circeParser % Test,
+                                scalaTest   % Test)
+  )
+
+lazy val shaclValidatorTQ = project
+  .in(file("modules/ld/shacl-topquadrant-validator"))
+  .dependsOn(http, test)
+  .settings(
+    name       := "shacl-topquadrant-validator",
+    moduleName := "shacl-topquadrant-validator",
+    resolvers  += Resolver.bintrayRepo("bogdanromanx", "maven"),
+    libraryDependencies ++= Seq(catsCore,
+                                journal,
+                                rdfCirce,
+                                topQuadrantShacl,
                                 akkaSlf4j   % Test,
                                 circeParser % Test,
                                 scalaTest   % Test)
@@ -201,7 +220,16 @@ lazy val root = project
   .in(file("."))
   .settings(name := "commons", moduleName := "commons")
   .settings(noPublish)
-  .aggregate(types, http, test, queryTypes, elasticServerEmbed, elasticClient, sparqlClient, shaclValidator, schemas)
+  .aggregate(types,
+             http,
+             test,
+             queryTypes,
+             elasticServerEmbed,
+             elasticClient,
+             sparqlClient,
+             shaclValidator,
+             shaclValidatorTQ,
+             schemas)
 
 lazy val noPublish = Seq(publishLocal := {}, publish := {}, publishArtifact := false)
 
