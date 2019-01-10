@@ -167,7 +167,7 @@ lazy val forwardClient = project
     name       := "forward-client",
     moduleName := "forward-client",
     organization := "hbp.kg.nexus",
-    version    := "0.10.19",
+    version    := "0.10.20",
     libraryDependencies ++= Seq(
       akkaStream,
       circeCore,
@@ -227,6 +227,7 @@ lazy val root = project
              elasticServerEmbed,
              elasticClient,
              sparqlClient,
+    forwardClient,
              shaclValidator,
              shaclValidatorTQ,
              schemas)
