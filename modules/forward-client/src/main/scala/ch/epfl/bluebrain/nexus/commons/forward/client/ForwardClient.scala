@@ -24,11 +24,12 @@ import scala.concurrent.ExecutionContext
   * @param base        the base uri of the ForwardSearch endpoint
   * @tparam F the monadic effect type
   */
-class ForwardClient[F[_]](base: Uri)(implicit
-                                        cl: UntypedHttpClient[F],
-                                        ec: ExecutionContext,
-                                        F: MonadError[F, Throwable])
-    extends ForwardBaseClient[F] {
+class ForwardClient[F[_]](val base: Uri)(
+  implicit
+  cl: UntypedHttpClient[F],
+  ec: ExecutionContext,
+  F: MonadError[F, Throwable]
+) extends ForwardBaseClient[F] {
 
   /**
     * Build a creation request with the provided ''id'' and ''payload''
@@ -37,9 +38,14 @@ class ForwardClient[F[_]](base: Uri)(implicit
     *                  properly. It is not interpreted by the forward client
     * @param payload the document's payload
     */
-  def create(fullId: String, payload: Json, authorIdOpt: Option[String] = None, eventDateTimeOpt: Option[String] = None): F[Unit] = {
-    val queryParameters = Map( "authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt)
-      .collect{ case (key, Some(value)) => (key, value)}
+  def create(
+    fullId: String,
+    payload: Json,
+    authorIdOpt: Option[String] = None,
+    eventDateTimeOpt: Option[String] = None
+  ): F[Unit] = {
+    val queryParameters = Map("authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt)
+      .collect { case (key, Some(value)) => (key, value) }
     val uri = base.copy(path = base.path ++ Path(fullId)).withQuery(Query(queryParameters))
 
     log.info(s"forward client - creation id: ${fullId}")
@@ -53,9 +59,14 @@ class ForwardClient[F[_]](base: Uri)(implicit
     *                  properly. It is not interpreted by the forward client
     * @param payload   the document's payload
     */
-  def update(fullId: String, payload: Json, authorIdOpt: Option[String] = None, eventDateTimeOpt: Option[String] = None): F[Unit] = {
-    val queryParameters = Map( "authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt)
-      .collect{ case (key, Some(value)) => (key, value)}
+  def update(
+    fullId: String,
+    payload: Json,
+    authorIdOpt: Option[String] = None,
+    eventDateTimeOpt: Option[String] = None
+  ): F[Unit] = {
+    val queryParameters = Map("authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt)
+      .collect { case (key, Some(value)) => (key, value) }
     val uri = base.copy(path = base.path ++ Path(fullId)).withQuery(Query(queryParameters))
 
     log.info(s"forward client - update id: ${fullId}")
@@ -68,10 +79,15 @@ class ForwardClient[F[_]](base: Uri)(implicit
     * @param fullId    the full id of the document to update (may contain path and rev). Up to the caller to format it
     *                  properly. It is not interpreted by the forward client
     */
-  def delete(fullId: String, revOpt: Option[String] = None, authorIdOpt: Option[String] = None, eventDateTimeOpt: Option[String] = None): F[Unit] = {
-    val queryParameters = Map( "authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt, "rev" -> revOpt)
-        .collect{ case (key, Some(value)) => (key, value)}
-    val uri =  base.copy(path = base.path ++ Path(fullId)).withQuery(Query(queryParameters))
+  def delete(
+    fullId: String,
+    revOpt: Option[String] = None,
+    authorIdOpt: Option[String] = None,
+    eventDateTimeOpt: Option[String] = None
+  ): F[Unit] = {
+    val queryParameters = Map("authorId" -> authorIdOpt, "eventDateTime" -> eventDateTimeOpt, "rev" -> revOpt)
+      .collect { case (key, Some(value)) => (key, value) }
+    val uri = base.copy(path = base.path ++ Path(fullId)).withQuery(Query(queryParameters))
 
     log.info(s"forward client - creation id: ${fullId}")
     execute(Delete(uri), Set(OK), "forward delete")
@@ -87,7 +103,7 @@ class ForwardClient[F[_]](base: Uri)(implicit
     val uri = base.copy(path = base.path ++ Path(fullId))
     rs(Get(uri)).recoverWith {
       case UnexpectedUnsuccessfulHttpResponse(r) => ForwardFailure.fromResponse(r).flatMap(F.raiseError)
-      case other => F.raiseError(other)
+      case other                                 => F.raiseError(other)
     }
   }
 
@@ -101,10 +117,12 @@ object ForwardClient {
     * @param base        the base uri of the Forward endpoint
     * @tparam F the monadic effect type
     */
-  final def apply[F[_]](base: Uri)(implicit
-                                   cl: UntypedHttpClient[F],
-                                   ec: ExecutionContext,
-                                   F: MonadError[F, Throwable]): ForwardClient[F] =
+  final def apply[F[_]](base: Uri)(
+    implicit
+    cl: UntypedHttpClient[F],
+    ec: ExecutionContext,
+    F: MonadError[F, Throwable]
+  ): ForwardClient[F] =
     new ForwardClient(base)
 
 }
