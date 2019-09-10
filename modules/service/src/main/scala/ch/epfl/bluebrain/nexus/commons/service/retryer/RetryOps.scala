@@ -3,12 +3,15 @@ package ch.epfl.bluebrain.nexus.commons.service.retryer
 import ch.epfl.bluebrain.nexus.commons.types.RetriableErr
 import monix.eval.Task
 import monix.execution.Scheduler
+import org.slf4j.LoggerFactory
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
 object RetryOps {
+
+  private val logger = LoggerFactory.getLogger(this.getClass)
 
   /**
     * Execute a [[Future]] and provide a retry mechanism on failures of any subtype of [[RetriableErr]].
@@ -19,22 +22,26 @@ object RetryOps {
     * @tparam A the generic type of the [[Future]]s result
     */
   def retry[A](source: () => Future[A], maxRetries: Int, strategy: RetryStrategy)(
-      implicit ec: ExecutionContext): Future[A] = {
+    implicit ec: ExecutionContext
+  ): Future[A] = {
     val s = Task.deferFuture {
       source()
     }
     implicit val sc = Scheduler(ec)
 
-    def inner(retry: Int, currentDelay: FiniteDuration): Task[A] = {
+    def inner(retry: Int, currentDelay: FiniteDuration): Task[A] =
       s.onErrorHandleWith {
         case ex: RetriableErr =>
           if (retry > 0)
             inner(retry - 1, strategy.next(currentDelay)).delayExecution(currentDelay)
-          else
+          else {
+            logger.error(s"Retriable error reached max retry ${ex.getMessage} ", ex)
             Task.raiseError(ex)
-        case ex => Task.raiseError(ex)
+          }
+        case ex =>
+          logger.error(s"Non retriable error thrown ${ex.getMessage}", ex)
+          Task.raiseError(ex)
       }
-    }
 
     inner(maxRetries, strategy.init).runAsync
   }
@@ -46,7 +53,7 @@ object RetryOps {
     * @param ec     the implicitly available [[ExecutionContext]]
     * @tparam A the generic type of the [[Future]]s result
     */
-  final implicit class Retryable[A](val source: () => Future[A])(implicit ec: ExecutionContext) {
+  implicit final class Retryable[A](val source: () => Future[A])(implicit ec: ExecutionContext) {
 
     /**
       * Method exposed on () => Future[A] instances
