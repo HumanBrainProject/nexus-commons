@@ -1,17 +1,17 @@
 package ch.epfl.bluebrain.nexus.commons.service.retryer
 
 import ch.epfl.bluebrain.nexus.commons.types.RetriableErr
+import journal.Logger
 import monix.eval.Task
 import monix.execution.Scheduler
-import org.slf4j.LoggerFactory
-
+import journal.Logger
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
 object RetryOps {
 
-  private val logger = LoggerFactory.getLogger(this.getClass)
+  private val log = Logger[this.type]
 
   /**
     * Execute a [[Future]] and provide a retry mechanism on failures of any subtype of [[RetriableErr]].
@@ -35,11 +35,11 @@ object RetryOps {
           if (retry > 0)
             inner(retry - 1, strategy.next(currentDelay)).delayExecution(currentDelay)
           else {
-            logger.error(s"Retriable error reached max retry ${ex.getMessage} ", ex)
+            log.error(s"Retriable error reached max retry ${ex.getMessage} ", ex)
             Task.raiseError(ex)
           }
         case ex =>
-          logger.error(s"Non retriable error thrown ${ex.getMessage}", ex)
+          log.error(s"Non retriable error thrown ${ex.getMessage}", ex)
           Task.raiseError(ex)
       }
 
