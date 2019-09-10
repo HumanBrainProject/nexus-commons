@@ -37,7 +37,7 @@ val journalVersion                  = "3.0.19"
 val akkaVersion                     = "2.5.9"
 val akkaPersistenceInMemVersion     = "2.5.1.1"
 val akkaPersistenceCassandraVersion = "0.55"
-val akkaHttpVersion                 = "10.0.11"
+val akkaHttpVersion                 = "10.1.9"
 val akkaHttpCirceVersion            = "1.19.0"
 val elasticSearchVersion            = "6.1.2"
 val log4jVersion                    = "2.10.0"
@@ -273,10 +273,10 @@ lazy val forwardClient = project
   .in(file("modules/forward-client"))
   .dependsOn(http, queryTypes, test % Test)
   .settings(
-    name       := "forward-client",
-    moduleName := "forward-client",
+    name         := "forward-client",
+    moduleName   := "forward-client",
     organization := "hbp.kg.nexus",
-    version    := "1.0.0",
+    version      := "1.0.0",
     libraryDependencies ++= Seq(
       akkaStream,
       circeCore,
@@ -306,22 +306,24 @@ lazy val root = project
   .in(file("."))
   .settings(name := "commons", moduleName := "commons")
   .settings(noPublish)
-  .aggregate(types,
-             sourcing,
-             sourcingAkka,
-             sourcingMem,
-             http,
-             test,
-             kamon,
-             service,
-             queryTypes,
-             elasticServerEmbed,
-             elasticClient,
-             sparqlClient,
-             forwardClient,
-             shaclValidator,
-             iam,
-             schemas)
+  .aggregate(
+    types,
+    sourcing,
+    sourcingAkka,
+    sourcingMem,
+    http,
+    test,
+    kamon,
+    service,
+    queryTypes,
+    elasticServerEmbed,
+    elasticClient,
+    sparqlClient,
+    forwardClient,
+    shaclValidator,
+    iam,
+    schemas
+  )
 
 lazy val noPublish = Seq(
   publishLocal    := {},
