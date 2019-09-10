@@ -25,6 +25,7 @@ object RetryOps {
     implicit ec: ExecutionContext
   ): Future[A] = {
     val s = Task.deferFuture {
+      log.info("Executing indexing")
       source()
     }
     implicit val sc = Scheduler(ec)
