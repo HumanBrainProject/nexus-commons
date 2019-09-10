@@ -11,7 +11,7 @@ import scala.util.Random
 
 object RetryOps {
 
-  private val log = Logger[this.type]
+  private[commons] val log = Logger[this.type]
 
   /**
     * Execute a [[Future]] and provide a retry mechanism on failures of any subtype of [[RetriableErr]].
