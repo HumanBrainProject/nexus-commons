@@ -33,6 +33,7 @@ object ForwardFailure {
   )(implicit cl: UntypedHttpClient[F], F: MonadError[F, Throwable]): F[ForwardFailure] = {
     log.info(s"Forward failure response info - ${r.toString()}")
     logger.info(s"Forward failure response info with different logger - ${r.toString()}")
+    cl.akkaLogger.info(s"Forward failure response info with akka logger - ${r.toString()}")
     cl.toString(r.entity).map(body => fromStatusCode(r.status, body))
   }
 

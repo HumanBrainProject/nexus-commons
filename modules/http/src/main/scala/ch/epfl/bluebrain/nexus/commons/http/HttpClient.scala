@@ -1,6 +1,7 @@
 package ch.epfl.bluebrain.nexus.commons.http
 
 import akka.actor.ActorSystem
+import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMessage.DiscardedEntity
 import akka.http.scaladsl.model.{HttpEntity, HttpRequest, HttpResponse, StatusCode}
@@ -22,6 +23,8 @@ import scala.reflect.ClassTag
   * @tparam A the unmarshalled return type of a request
   */
 trait HttpClient[F[_], A] {
+
+  val akkaLogger: LoggingAdapter
 
   /**
     * Execute the argument request and unmarshal the response into an ''A''.
@@ -51,8 +54,6 @@ trait HttpClient[F[_], A] {
 }
 
 object HttpClient {
-
-  private val log = Logger[this.type]
 
   /**
     * Type alias for [[ch.epfl.bluebrain.nexus.commons.http.HttpClient]] that has the unmarshalled return type
@@ -96,14 +97,23 @@ object HttpClient {
     // $COVERAGE-OFF$
     final def akkaHttpClient(implicit as: ActorSystem, mt: Materializer): UntypedHttpClient[Future] =
       new HttpClient[Future, HttpResponse] {
-
+        override val akkaLogger: LoggingAdapter = Logging(as, HttpClient.getClass)
         import as.dispatcher
 
-        override def apply(req: HttpRequest): Future[HttpResponse] =
-          Http().singleRequest(req).map { resp =>
-            log.info(s"RESPONSE LOGGING - ${resp.toString()}")
-            resp
-          }
+        override def apply(req: HttpRequest): Future[HttpResponse] = {
+          akkaLogger.info(s"REQUEST LOGGING - ${req.toString()}")
+          Http()
+            .singleRequest(req)
+            .map { resp =>
+              akkaLogger.info(s"RESPONSE LOGGING - ${resp.toString()}")
+              resp
+            }
+            .recoverWith {
+              case e: Throwable =>
+                akkaLogger.error(s"An error occurred ${e.getMessage}", e)
+                Future.failed(e)
+            }
+        }
 
         override def discardBytes(entity: HttpEntity): Future[DiscardedEntity] =
           Future.successful(entity.discardBytes())
@@ -134,7 +144,7 @@ object HttpClient {
       um: FromEntityUnmarshaller[A]
     ): HttpClient[Future, A] =
       new HttpClient[Future, A] {
-
+        override val akkaLogger: LoggingAdapter = cl.akkaLogger
         private val log = Logger(s"TypedHttpClient[${implicitly[ClassTag[A]]}]")
 
         override def apply(req: HttpRequest): Future[A] =
