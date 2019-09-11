@@ -35,16 +35,21 @@ object RetryOps {
     }
     implicit val sc = Scheduler(ec)
 
+    def retriableExpeptionHandling(ex: Exception, retry: Int, currentDelay: FiniteDuration) = {
+      logging(s" Retriable error of type ${ex.getClass} ${ex.getMessage}", Some(ex))
+      if (retry > 0)
+        inner(retry - 1, strategy.next(currentDelay)).delayExecution(currentDelay)
+      else {
+        logging(s"Retriable error reached max retry ${ex.getMessage} ", Some(ex))
+        Task.raiseError(ex)
+      }
+    }
     def inner(retry: Int, currentDelay: FiniteDuration): Task[A] =
       s.onErrorHandleWith {
-        case ex: RetriableErr | IOException =>
-          logging(s" Retriable error of type ${ex.getClass} ${ex.getMessage}", Some(ex))
-          if (retry > 0)
-            inner(retry - 1, strategy.next(currentDelay)).delayExecution(currentDelay)
-          else {
-            logging(s"Retriable error reached max retry ${ex.getMessage} ", Some(ex))
-            Task.raiseError(ex)
-          }
+        case ex: RetriableErr =>
+          retriableExpeptionHandling(ex, retry, currentDelay)
+        case ex: IOException =>
+          retriableExpeptionHandling(ex, retry, currentDelay)
         case ex =>
           logging(s"Non retriable error thrown ${ex.getMessage}", Some(ex))
           Task.raiseError(ex)
