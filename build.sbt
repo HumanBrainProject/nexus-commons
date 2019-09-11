@@ -304,7 +304,7 @@ lazy val schemas = project
 
 lazy val root = project
   .in(file("."))
-  .settings(name := "commons", moduleName := "commons")
+  .settings(name := "commons", moduleName := "commons", version := "0.7.21")
   .settings(noPublish)
   .aggregate(
     types,
@@ -346,7 +346,8 @@ inThisBuild(
     // These are the sbt-release-early settings to configure
     releaseEarlyWith              := BintrayPublisher,
     releaseEarlyNoGpg             := true,
-    releaseEarlyEnableSyncToMaven := false
+    releaseEarlyEnableSyncToMaven := false,
+    version                       := "0.7.21"
   )
 )
 
