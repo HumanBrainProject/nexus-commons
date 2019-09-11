@@ -3,9 +3,10 @@ package ch.epfl.bluebrain.nexus.commons.service.stream
 import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Status}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
+import akka.event.Logging
 import akka.pattern.pipe
 import akka.stream.scaladsl.{Keep, RunnableGraph, Sink, Source}
-import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings, KillSwitches, Supervision, UniqueKillSwitch}
 import ch.epfl.bluebrain.nexus.commons.service.stream.SingletonStreamCoordinator._
 import shapeless.Typeable
 
@@ -22,10 +23,18 @@ class SingletonStreamCoordinator[A: Typeable, E](init: () => Future[A], source: 
     extends Actor
     with ActorLogging {
 
-  private val A                              = implicitly[Typeable[A]]
-  private implicit val as: ActorSystem       = context.system
-  private implicit val ec: ExecutionContext  = context.dispatcher
-  private implicit val mt: ActorMaterializer = ActorMaterializer()
+  private val A = implicitly[Typeable[A]]
+  implicit private val as: ActorSystem = context.system
+  implicit private val ec: ExecutionContext = context.dispatcher
+  private val logging = Logging(as, SingletonStreamCoordinator.getClass)
+
+  val decider: Supervision.Decider = { e =>
+    logging.error("Unhandled exception in stream", e)
+    Supervision.Stop
+  }
+  val materializerSettings = ActorMaterializerSettings(as).withSupervisionStrategy(decider)
+
+  implicit private val mt: ActorMaterializer = ActorMaterializer(materializerSettings)
 
   private def initialize(): Unit = {
     val _ = init().map(Start).recover { case _ => initialize() } pipeTo self
@@ -36,18 +45,19 @@ class SingletonStreamCoordinator[A: Typeable, E](init: () => Future[A], source: 
     initialize()
   }
 
-  private def buildStream(a: A): RunnableGraph[(UniqueKillSwitch, Future[Done])] = {
+  private def buildStream(a: A): RunnableGraph[(UniqueKillSwitch, Future[Done])] =
     source(a)
       .viaMat(KillSwitches.single)(Keep.right)
       .toMat(Sink.ignore)(Keep.both)
-  }
 
   override def receive: Receive = {
     case Start(any) =>
       A.cast(any) match {
         case Some(a) =>
-          log.info("Received initial start value of type '{}', running the indexing function across the element stream",
-                   A.describe)
+          log.info(
+            "Received initial start value of type '{}', running the indexing function across the element stream",
+            A.describe
+          )
           val (killSwitch, doneFuture) = buildStream(a).run()
           doneFuture pipeTo self
           context.become(running(killSwitch))
@@ -96,7 +106,7 @@ class SingletonStreamCoordinator[A: Typeable, E](init: () => Future[A], source: 
 }
 
 object SingletonStreamCoordinator {
-  private[service] final case class Start(any: Any)
+  final private[service] case class Start(any: Any)
   final case object Stop
 
   /**
@@ -107,9 +117,11 @@ object SingletonStreamCoordinator {
     */
   // $COVERAGE-OFF$
   final def props[A: Typeable, E](init: () => Future[A], source: A => Source[E, _])(implicit as: ActorSystem): Props =
-    ClusterSingletonManager.props(Props(new SingletonStreamCoordinator(init, source)),
-                                  terminationMessage = Stop,
-                                  settings = ClusterSingletonManagerSettings(as))
+    ClusterSingletonManager.props(
+      Props(new SingletonStreamCoordinator(init, source)),
+      terminationMessage = Stop,
+      settings = ClusterSingletonManagerSettings(as)
+    )
 
   /**
     * Builds a cluster singleton actor of type [[SingletonStreamCoordinator]].
@@ -118,7 +130,8 @@ object SingletonStreamCoordinator {
     * @param source an initialization function that produces a stream from an initial start value
     */
   final def start[A: Typeable, E](init: () => Future[A], source: A => Source[E, _], name: String)(
-      implicit as: ActorSystem): ActorRef =
+    implicit as: ActorSystem
+  ): ActorRef =
     as.actorOf(props(init, source), name)
   // $COVERAGE-ON$
 }
