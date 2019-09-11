@@ -93,7 +93,11 @@ object SequentialTagIndexer {
       case (off, persistenceId, el) =>
         (() => index(el))
           .retry(retries, logging)
-          .recoverWith { case _ => failureLog.storeEvent(persistenceId, off, el) }
+          .recoverWith {
+            case e =>
+              log.error(s"Could not recover ${el.toString}", e)
+              failureLog.storeEvent(persistenceId, off, el)
+          }
           .map(_ => off)
     }
   }
