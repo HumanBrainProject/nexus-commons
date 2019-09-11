@@ -11,9 +11,11 @@ import journal.Logger
   *
   * @tparam F the monadic effect type
   */
-abstract class ForwardBaseClient[F[_]](implicit
-                                       cl: UntypedHttpClient[F],
-                                       F: MonadError[F, Throwable]) {
+abstract class ForwardBaseClient[F[_]](
+  implicit
+  cl: UntypedHttpClient[F],
+  F: MonadError[F, Throwable]
+) {
   private[client] val log = Logger[this.type]
 
   private[client] def execute(req: HttpRequest, expectedCodes: Set[StatusCode]): F[Unit] =
@@ -22,17 +24,20 @@ abstract class ForwardBaseClient[F[_]](implicit
   private[client] def execute(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => String): F[Unit] =
     executeWith(req, expectedCodes, Some(intent))
 
-  private def executeWith(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => Option[String]): F[Unit] =
+  private def executeWith(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => Option[String]): F[Unit] = {
+    log.info(s"EXECUTE WITH - request: ${req.toString()}")
     cl(req).discardOnCodesOr(expectedCodes) { resp =>
       ForwardFailure.fromResponse(resp).flatMap { f =>
-        val _ = intent.map(msg =>
-          log.error(
-            s"Unexpected Service response for intent '$msg':\nRequest: '${req.method} ${req.uri}'\nStatus: '${resp.status}'\nResponse: '${f.body}'"))
+        val _ = intent.map(
+          msg =>
+            log.error(
+              s"Unexpected Service response for intent '$msg':\nRequest: '${req.method} ${req.uri}'\nStatus: '${resp.status}'\nResponse: '${f.body}'"
+            )
+        )
         F.raiseError(f)
       }
     }
+  }
 }
 
-object ForwardBaseClient {
-
-}
+object ForwardBaseClient {}

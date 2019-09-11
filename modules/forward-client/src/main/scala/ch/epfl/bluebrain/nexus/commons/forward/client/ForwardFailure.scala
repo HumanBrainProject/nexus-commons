@@ -20,8 +20,8 @@ trait ForwardFailure extends Err {
 
 @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
 object ForwardFailure {
-  private val log = LoggerFactory.getLogger(this.getClass)
-  private val logger = Logger[this.type]
+  private[commons] val log = LoggerFactory.getLogger(this.getClass)
+  private[commons] val logger = Logger[this.type]
 
   /**
     * Generates a Forward failure from the HTTP response .
