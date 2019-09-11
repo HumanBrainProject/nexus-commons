@@ -85,86 +85,86 @@ object HttpClient {
         if (expectedCodes.contains(r.status)) cl.discardBytes(r.entity).map(_ => ())
         else onFailure(r)
       }
+  }
 
-    /**
-      * Constructs an [[ch.epfl.bluebrain.nexus.commons.http.HttpClient.UntypedHttpClient]] instance using an
-      * underlying akka http client.
-      *
-      * @param as an implicit actor system
-      * @param mt an implicit materializer
-      * @return an untyped http client based on akka http transport
-      */
-    // $COVERAGE-OFF$
-    final def akkaHttpClient(implicit as: ActorSystem, mt: Materializer): UntypedHttpClient[Future] =
-      new HttpClient[Future, HttpResponse] {
-        override val akkaLogger: LoggingAdapter = Logging(as, HttpClient.getClass)
-        import as.dispatcher
+  /**
+    * Constructs an [[ch.epfl.bluebrain.nexus.commons.http.HttpClient.UntypedHttpClient]] instance using an
+    * underlying akka http client.
+    *
+    * @param as an implicit actor system
+    * @param mt an implicit materializer
+    * @return an untyped http client based on akka http transport
+    */
+  // $COVERAGE-OFF$
+  final def akkaHttpClient(implicit as: ActorSystem, mt: Materializer): UntypedHttpClient[Future] =
+    new HttpClient[Future, HttpResponse] {
+      override val akkaLogger: LoggingAdapter = Logging(as, HttpClient.getClass)
+      import as.dispatcher
 
-        override def apply(req: HttpRequest): Future[HttpResponse] = {
-          akkaLogger.info(s"REQUEST LOGGING - ${req.toString()}")
-          Http()
-            .singleRequest(req)
-            .map { resp =>
-              akkaLogger.info(s"RESPONSE LOGGING - ${resp.toString()}")
-              resp
-            }
-            .recoverWith {
-              case e: Throwable =>
-                akkaLogger.error(s"An error occurred ${e.getMessage}", e)
-                Future.failed(e)
-            }
-        }
-
-        override def discardBytes(entity: HttpEntity): Future[DiscardedEntity] =
-          Future.successful(entity.discardBytes())
-
-        override def toString(entity: HttpEntity): Future[String] =
-          entity.dataBytes.runFold(ByteString(""))(_ ++ _).map(_.utf8String)
+      override def apply(req: HttpRequest): Future[HttpResponse] = {
+        akkaLogger.info(s"REQUEST LOGGING - ${req.toString()}")
+        Http()
+          .singleRequest(req)
+          .map { resp =>
+            akkaLogger.info(s"RESPONSE LOGGING - ${resp.toString()}")
+            resp
+          }
+          .recoverWith {
+            case e: Throwable =>
+              akkaLogger.error(s"An error occurred ${e.getMessage}", e)
+              Future.failed(e)
+          }
       }
 
-    /**
-      * Constructs a typed ''HttpClient[Future, A]'' from an ''UntypedHttpClient[Future]'' by attempting to unmarshal the
-      * response entity into the specific type ''A'' using an implicit ''FromEntityUnmarshaller[A]''.
-      *
-      * Delegates all calls to the underlying untyped http client.
-      *
-      * If the response status is not successful, the entity bytes will be discarded instead.
-      *
-      * @param ec an implicit execution context
-      * @param mt an implicit materializer
-      * @param cl an implicit untyped http client
-      * @param um an implicit ''FromEntityUnmarshaller[A]''
-      * @tparam A the specific type to which the response entity should be unmarshalled into
-      */
-    implicit final def withAkkaUnmarshaller[A: ClassTag](
-      implicit
-      ec: ExecutionContext,
-      mt: Materializer,
-      cl: UntypedHttpClient[Future],
-      um: FromEntityUnmarshaller[A]
-    ): HttpClient[Future, A] =
-      new HttpClient[Future, A] {
-        override val akkaLogger: LoggingAdapter = cl.akkaLogger
-        private val log = Logger(s"TypedHttpClient[${implicitly[ClassTag[A]]}]")
+      override def discardBytes(entity: HttpEntity): Future[DiscardedEntity] =
+        Future.successful(entity.discardBytes())
 
-        override def apply(req: HttpRequest): Future[A] =
-          cl(req).flatMap { resp =>
-            if (resp.status.isSuccess()) um(resp.entity)
-            else {
-              log.error(s"Unsuccessful HTTP response for '${req.uri}', status: '${resp.status}', discarding bytes")
-              discardBytes(resp.entity).flatMap { _ =>
-                log.debug(s"Discarded response bytes for request '${req.uri}'")
-                Future.failed(UnexpectedUnsuccessfulHttpResponse(resp))
-              }
+      override def toString(entity: HttpEntity): Future[String] =
+        entity.dataBytes.runFold(ByteString(""))(_ ++ _).map(_.utf8String)
+    }
+
+  /**
+    * Constructs a typed ''HttpClient[Future, A]'' from an ''UntypedHttpClient[Future]'' by attempting to unmarshal the
+    * response entity into the specific type ''A'' using an implicit ''FromEntityUnmarshaller[A]''.
+    *
+    * Delegates all calls to the underlying untyped http client.
+    *
+    * If the response status is not successful, the entity bytes will be discarded instead.
+    *
+    * @param ec an implicit execution context
+    * @param mt an implicit materializer
+    * @param cl an implicit untyped http client
+    * @param um an implicit ''FromEntityUnmarshaller[A]''
+    * @tparam A the specific type to which the response entity should be unmarshalled into
+    */
+  implicit final def withAkkaUnmarshaller[A: ClassTag](
+    implicit
+    ec: ExecutionContext,
+    mt: Materializer,
+    cl: UntypedHttpClient[Future],
+    um: FromEntityUnmarshaller[A]
+  ): HttpClient[Future, A] =
+    new HttpClient[Future, A] {
+      override val akkaLogger: LoggingAdapter = cl.akkaLogger
+      private val log = Logger(s"TypedHttpClient[${implicitly[ClassTag[A]]}]")
+
+      override def apply(req: HttpRequest): Future[A] =
+        cl(req).flatMap { resp =>
+          if (resp.status.isSuccess()) um(resp.entity)
+          else {
+            log.error(s"Unsuccessful HTTP response for '${req.uri}', status: '${resp.status}', discarding bytes")
+            discardBytes(resp.entity).flatMap { _ =>
+              log.debug(s"Discarded response bytes for request '${req.uri}'")
+              Future.failed(UnexpectedUnsuccessfulHttpResponse(resp))
             }
           }
+        }
 
-        override def discardBytes(entity: HttpEntity): Future[DiscardedEntity] =
-          cl.discardBytes(entity)
+      override def discardBytes(entity: HttpEntity): Future[DiscardedEntity] =
+        cl.discardBytes(entity)
 
-        override def toString(entity: HttpEntity): Future[String] =
-          cl.toString(entity)
-      }
-  }
+      override def toString(entity: HttpEntity): Future[String] =
+        cl.toString(entity)
+    }
   // $COVERAGE-ON$
 }
