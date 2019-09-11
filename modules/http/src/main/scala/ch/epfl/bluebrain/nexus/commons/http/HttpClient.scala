@@ -65,8 +65,10 @@ object HttpClient {
     *
     * @param resp the [[HttpResponse]] wrapped in ''F[_]''
     */
-  implicit class HttpResponseSyntax[F[_]](resp: F[HttpResponse])(implicit F: MonadError[F, Throwable],
-                                                                 cl: UntypedHttpClient[F]) {
+  implicit class HttpResponseSyntax[F[_]](resp: F[HttpResponse])(
+    implicit F: MonadError[F, Throwable],
+    cl: UntypedHttpClient[F]
+  ) {
 
     /**
       * Discards the response's bytes of the response's status matches some of ''expectedCodes''
@@ -75,7 +77,7 @@ object HttpClient {
       * @param expectedCodes the codes to verify against the response code
       * @param onFailure     the function to run when the response code does not match ''expectedCodes''
       */
-    def discardOnCodesOr(expectedCodes: Set[StatusCode])(onFailure: => (HttpResponse) => F[Unit]): F[Unit] = {
+    def discardOnCodesOr(expectedCodes: Set[StatusCode])(onFailure: => (HttpResponse) => F[Unit]): F[Unit] =
       resp.flatMap { r =>
         if (expectedCodes.contains(r.status)) cl.discardBytes(r.entity).map(_ => ())
         else onFailure(r)
@@ -120,11 +122,13 @@ object HttpClient {
     * @param um an implicit ''FromEntityUnmarshaller[A]''
     * @tparam A the specific type to which the response entity should be unmarshalled into
     */
-  final implicit def withAkkaUnmarshaller[A: ClassTag](implicit
-                                                       ec: ExecutionContext,
-                                                       mt: Materializer,
-                                                       cl: UntypedHttpClient[Future],
-                                                       um: FromEntityUnmarshaller[A]): HttpClient[Future, A] =
+  implicit final def withAkkaUnmarshaller[A: ClassTag](
+    implicit
+    ec: ExecutionContext,
+    mt: Materializer,
+    cl: UntypedHttpClient[Future],
+    um: FromEntityUnmarshaller[A]
+  ): HttpClient[Future, A] =
     new HttpClient[Future, A] {
 
       private val log = Logger(s"TypedHttpClient[${implicitly[ClassTag[A]]}]")

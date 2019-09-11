@@ -7,6 +7,7 @@ import cats.syntax.functor._
 import ch.epfl.bluebrain.nexus.commons.http.HttpClient.UntypedHttpClient
 import ch.epfl.bluebrain.nexus.commons.types.{Err, RetriableErr}
 import journal.Logger
+import org.slf4j.LoggerFactory
 
 @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
 trait ForwardFailure extends Err {
@@ -19,7 +20,7 @@ trait ForwardFailure extends Err {
 
 @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
 object ForwardFailure {
-  private[client] val log = Logger[this.type]
+  private val log = LoggerFactory.getLogger(this.getClass)
 
   /**
     * Generates a Forward failure from the HTTP response .
