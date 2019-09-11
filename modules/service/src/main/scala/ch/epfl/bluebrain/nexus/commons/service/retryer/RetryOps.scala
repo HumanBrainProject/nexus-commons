@@ -21,11 +21,14 @@ object RetryOps {
     * @param strategy      the delay strategy between retries
     * @tparam A the generic type of the [[Future]]s result
     */
-  def retry[A](source: () => Future[A], maxRetries: Int, strategy: RetryStrategy)(
-    implicit ec: ExecutionContext
-  ): Future[A] = {
+  def retry[A](
+    source: () => Future[A],
+    maxRetries: Int,
+    strategy: RetryStrategy,
+    logging: (String, Option[Throwable]) => Unit
+  )(implicit ec: ExecutionContext): Future[A] = {
     val s = Task.deferFuture {
-      log.info("Executing indexing")
+      logging("Executing indexing", None)
       source()
     }
     implicit val sc = Scheduler(ec)
@@ -36,11 +39,11 @@ object RetryOps {
           if (retry > 0)
             inner(retry - 1, strategy.next(currentDelay)).delayExecution(currentDelay)
           else {
-            log.error(s"Retriable error reached max retry ${ex.getMessage} ", ex)
+            logging(s"Retriable error reached max retry ${ex.getMessage} ", Some(ex))
             Task.raiseError(ex)
           }
         case ex =>
-          log.error(s"Non retriable error thrown ${ex.getMessage}", ex)
+          logging(s"Non retriable error thrown ${ex.getMessage}", Some(ex))
           Task.raiseError(ex)
       }
 
@@ -63,8 +66,10 @@ object RetryOps {
       * @param strategy   the implicitly available retry strategy between retry delays
       * @return an optional Json which contains only the filtered shape.
       */
-    def retry(maxRetries: Int)(implicit strategy: RetryStrategy): Future[A] =
-      RetryOps.retry(source, maxRetries, strategy)
+    def retry(maxRetries: Int, logging: (String, Option[Throwable]) => Unit)(
+      implicit strategy: RetryStrategy
+    ): Future[A] =
+      RetryOps.retry(source, maxRetries, strategy, logging)
   }
 }
 

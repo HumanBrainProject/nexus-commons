@@ -27,6 +27,7 @@ abstract class ForwardBaseClient[F[_]](
   private def executeWith(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => Option[String]): F[Unit] = {
     log.info(s"EXECUTE WITH - request: ${req.toString()}")
     cl(req).discardOnCodesOr(expectedCodes) { resp =>
+      log.info(s"EXECUTE INNER - response: ${resp.toString()}")
       ForwardFailure.fromResponse(resp).flatMap { f =>
         val _ = intent.map(
           msg =>

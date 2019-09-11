@@ -27,25 +27,26 @@ import scala.concurrent.duration.Duration
 object SequentialTagIndexer {
 
   private[persistence] def initialize(underlying: () => Future[Unit], id: String)(
-      implicit as: ActorSystem): () => Future[Offset] = {
+    implicit as: ActorSystem
+  ): () => Future[Offset] = {
     import as.dispatcher
     val projection = ResumableProjection(id)
-    () =>
-      underlying().flatMap(_ => projection.fetchLatestOffset)
+    () => underlying().flatMap(_ => projection.fetchLatestOffset)
   }
   private[persistence] def source[T](index: T => Future[Unit], id: String, pluginId: String, tag: String)(
-      implicit as: ActorSystem,
-      T: Typeable[T],
-      E: Encoder[T]): Offset => Source[Unit, NotUsed] = {
+    implicit as: ActorSystem,
+    T: Typeable[T],
+    E: Encoder[T]
+  ): Offset => Source[Unit, NotUsed] =
     source(toFlow(index, id), id, pluginId, tag)
-  }
 
   private[persistence] def source[T](
-      index: Flow[(Offset, String, T), Offset, _],
-      id: String,
-      pluginId: String,
-      tag: String)(implicit as: ActorSystem, T: Typeable[T]): Offset => Source[Unit, NotUsed] = {
-    val log        = Logging(as, SequentialTagIndexer.getClass)
+    index: Flow[(Offset, String, T), Offset, _],
+    id: String,
+    pluginId: String,
+    tag: String
+  )(implicit as: ActorSystem, T: Typeable[T]): Offset => Source[Unit, NotUsed] = {
+    val log = Logging(as, SequentialTagIndexer.getClass)
     val projection = ResumableProjection(id)
     (offset: Offset) =>
       PersistenceQuery(as)
@@ -66,23 +67,32 @@ object SequentialTagIndexer {
         .mapAsync(1)(offset => projection.storeLatestOffset(offset))
   }
   private def lookupRetriesConfig(implicit as: ActorSystem): (Int, RetryStrategy) = {
-    val config  = as.settings.config.getConfig("indexing.retry")
+    val config = as.settings.config.getConfig("indexing.retry")
+
     val retries = config.getInt("max-count")
     val backoff =
       Backoff(Duration(config.getDuration("max-duration", SECONDS), SECONDS), config.getDouble("random-factor"))
     (retries, backoff)
   }
 
-  private[persistence] def toFlow[T](index: T => Future[Unit], id: String)(
-      implicit as: ActorSystem,
-      E: Encoder[T]): Flow[(Offset, String, T), Offset, NotUsed] = {
+  private[persistence] def toFlow[T](
+    index: T => Future[Unit],
+    id: String
+  )(implicit as: ActorSystem, E: Encoder[T]): Flow[(Offset, String, T), Offset, NotUsed] = {
     import as.dispatcher
+    val log = Logging(as, SequentialTagIndexer.getClass)
+    log.debug("Logging inside toFlow")
+    def logging(s: String, error: Option[Throwable]): Unit = error match {
+      case Some(e) =>
+        log.error(s, e)
+      case None => log.info(s)
+    }
     implicit val (retries, backoff) = lookupRetriesConfig
-    val failureLog                  = IndexFailuresLog(id)
+    val failureLog = IndexFailuresLog(id)
     Flow[(Offset, String, T)].mapAsync(1) {
       case (off, persistenceId, el) =>
         (() => index(el))
-          .retry(retries)
+          .retry(retries, logging)
           .recoverWith { case _ => failureLog.storeEvent(persistenceId, off, el) }
           .map(_ => off)
     }
@@ -106,14 +116,15 @@ object SequentialTagIndexer {
     * @tparam T the event type
     */
   // $COVERAGE-OFF$
-  final def start[T](init: () => Future[Unit],
-                     index: T => Future[Unit],
-                     id: String,
-                     pluginId: String,
-                     tag: String,
-                     name: String)(implicit as: ActorSystem, T: Typeable[T], E: Encoder[T]): ActorRef = {
+  final def start[T](
+    init: () => Future[Unit],
+    index: T => Future[Unit],
+    id: String,
+    pluginId: String,
+    tag: String,
+    name: String
+  )(implicit as: ActorSystem, T: Typeable[T], E: Encoder[T]): ActorRef =
     SingletonStreamCoordinator.start(initialize(init, id), source(toFlow(index, id), id, pluginId, tag), name)
-  }
 
   /**
     * Generic tag indexer that uses the specified resumable projection to iterate over the collection of events selected
@@ -130,13 +141,14 @@ object SequentialTagIndexer {
     * @param T        a Typeable instance for the event type T
     * @tparam T the event type
     */
-  final def start[T](flow: Flow[(Offset, String, T), Offset, NotUsed],
-                     id: String,
-                     pluginId: String,
-                     tag: String,
-                     name: String)(implicit as: ActorSystem, T: Typeable[T]): ActorRef = {
+  final def start[T](
+    flow: Flow[(Offset, String, T), Offset, NotUsed],
+    id: String,
+    pluginId: String,
+    tag: String,
+    name: String
+  )(implicit as: ActorSystem, T: Typeable[T]): ActorRef =
     SingletonStreamCoordinator.start(initialize(() => Future.successful(()), id), source(flow, id, pluginId, tag), name)
-  }
 
   /**
     * Generic tag indexer that uses the specified resumable projection to iterate over the collection of events selected
@@ -155,9 +167,10 @@ object SequentialTagIndexer {
     * @tparam T the event type
     */
   final def start[T](index: T => Future[Unit], id: String, pluginId: String, tag: String, name: String)(
-      implicit as: ActorSystem,
-      T: Typeable[T],
-      E: Encoder[T]): ActorRef =
+    implicit as: ActorSystem,
+    T: Typeable[T],
+    E: Encoder[T]
+  ): ActorRef =
     start(() => Future.successful(()), index, id, pluginId, tag, name)
   // $COVERAGE-ON$
 }
