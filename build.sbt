@@ -347,7 +347,7 @@ inThisBuild(
     releaseEarlyWith              := BintrayPublisher,
     releaseEarlyNoGpg             := true,
     releaseEarlyEnableSyncToMaven := false,
-    version                       := "0.7.21"
+    version                       := "0.7.21.1"
   )
 )
 
