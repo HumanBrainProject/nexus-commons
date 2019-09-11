@@ -1,10 +1,12 @@
 package ch.epfl.bluebrain.nexus.commons.service.retryer
 
+import java.io.IOException
+
 import ch.epfl.bluebrain.nexus.commons.types.RetriableErr
 import journal.Logger
 import monix.eval.Task
 import monix.execution.Scheduler
-import journal.Logger
+
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
@@ -35,7 +37,8 @@ object RetryOps {
 
     def inner(retry: Int, currentDelay: FiniteDuration): Task[A] =
       s.onErrorHandleWith {
-        case ex: RetriableErr =>
+        case ex: RetriableErr | IOException =>
+          logging(s" Retriable error of type ${ex.getClass} ${ex.getMessage}", Some(ex))
           if (retry > 0)
             inner(retry - 1, strategy.next(currentDelay)).delayExecution(currentDelay)
           else {
