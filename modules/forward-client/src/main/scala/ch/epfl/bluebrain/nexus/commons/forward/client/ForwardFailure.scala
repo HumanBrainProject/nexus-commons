@@ -21,6 +21,7 @@ trait ForwardFailure extends Err {
 @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
 object ForwardFailure {
   private val log = LoggerFactory.getLogger(this.getClass)
+  private val logger = Logger[this.type]
 
   /**
     * Generates a Forward failure from the HTTP response .
@@ -31,6 +32,7 @@ object ForwardFailure {
     r: HttpResponse
   )(implicit cl: UntypedHttpClient[F], F: MonadError[F, Throwable]): F[ForwardFailure] = {
     log.info(s"Forward failure response info - ${r.toString()}")
+    logger.info(s"Forward failure response info with different logger - ${r.toString()}")
     cl.toString(r.entity).map(body => fromStatusCode(r.status, body))
   }
 
