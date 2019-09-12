@@ -3,6 +3,7 @@ package ch.epfl.bluebrain.nexus.commons.service.retryer
 import java.io.IOException
 import java.net.{ConnectException, SocketException}
 
+import akka.stream.StreamTcpException
 import akka.AkkaException
 import ch.epfl.bluebrain.nexus.commons.types.RetriableErr
 import journal.Logger
@@ -57,6 +58,8 @@ object RetryOps {
         case ex: IOException =>
           retriableExpeptionHandling(ex, retry, currentDelay)
         case ex: AkkaException =>
+          retriableExpeptionHandling(ex, retry, currentDelay)        
+        case ex: StreamTcpException =>
           retriableExpeptionHandling(ex, retry, currentDelay)
         case ex =>
           logging(s"Non retriable error thrown ${ex.getMessage} type: ${ex.getClass}", Some(ex))
