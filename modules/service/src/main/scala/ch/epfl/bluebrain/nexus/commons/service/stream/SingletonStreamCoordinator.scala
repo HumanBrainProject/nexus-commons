@@ -3,10 +3,9 @@ package ch.epfl.bluebrain.nexus.commons.service.stream
 import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Status}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
-import akka.event.Logging
 import akka.pattern.pipe
 import akka.stream.scaladsl.{Keep, RunnableGraph, Sink, Source}
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings, KillSwitches, Supervision, UniqueKillSwitch}
+import akka.stream.{ActorMaterializer, KillSwitches, UniqueKillSwitch}
 import ch.epfl.bluebrain.nexus.commons.service.stream.SingletonStreamCoordinator._
 import shapeless.Typeable
 
@@ -26,15 +25,8 @@ class SingletonStreamCoordinator[A: Typeable, E](init: () => Future[A], source: 
   private val A = implicitly[Typeable[A]]
   implicit private val as: ActorSystem = context.system
   implicit private val ec: ExecutionContext = context.dispatcher
-  private val logging = Logging(as, SingletonStreamCoordinator.getClass)
 
-  val decider: Supervision.Decider = { e =>
-    logging.error("Unhandled exception in stream", e)
-    Supervision.Stop
-  }
-  val materializerSettings = ActorMaterializerSettings(as).withSupervisionStrategy(decider)
-
-  implicit private val mt: ActorMaterializer = ActorMaterializer(materializerSettings)
+  implicit private val mt: ActorMaterializer = ActorMaterializer()
 
   private def initialize(): Unit = {
     val _ = init().map(Start).recover { case _ => initialize() } pipeTo self

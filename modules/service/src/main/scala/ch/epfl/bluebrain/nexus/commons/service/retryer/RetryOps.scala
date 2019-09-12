@@ -1,10 +1,6 @@
 package ch.epfl.bluebrain.nexus.commons.service.retryer
 
-import java.io.IOException
-import java.net.{ConnectException, SocketException}
-
 import akka.stream.StreamTcpException
-import akka.AkkaException
 import ch.epfl.bluebrain.nexus.commons.types.RetriableErr
 import journal.Logger
 import monix.eval.Task
@@ -26,43 +22,27 @@ object RetryOps {
     * @param strategy      the delay strategy between retries
     * @tparam A the generic type of the [[Future]]s result
     */
-  def retry[A](
-    source: () => Future[A],
-    maxRetries: Int,
-    strategy: RetryStrategy,
-    logging: (String, Option[Throwable]) => Unit
-  )(implicit ec: ExecutionContext): Future[A] = {
+  def retry[A](source: () => Future[A], maxRetries: Int, strategy: RetryStrategy)(
+    implicit ec: ExecutionContext
+  ): Future[A] = {
     val s = Task.deferFuture {
-      logging("Executing indexing", None)
       source()
     }
     implicit val sc = Scheduler(ec)
 
-    def retriableExpeptionHandling(ex: Exception, retry: Int, currentDelay: FiniteDuration) = {
-      logging(s" Retriable error of type ${ex.getClass} ${ex.getMessage}", Some(ex))
+    def retriableExpeptionHandling(ex: Exception, retry: Int, currentDelay: FiniteDuration) =
       if (retry > 0)
         inner(retry - 1, strategy.next(currentDelay)).delayExecution(currentDelay)
       else {
-        logging(s"Retriable error reached max retry ${ex.getMessage} ", Some(ex))
         Task.raiseError(ex)
       }
-    }
     def inner(retry: Int, currentDelay: FiniteDuration): Task[A] =
       s.onErrorHandleWith {
         case ex: RetriableErr =>
           retriableExpeptionHandling(ex, retry, currentDelay)
-        case ex: ConnectException =>
-          retriableExpeptionHandling(ex, retry, currentDelay)
-        case ex: SocketException =>
-          retriableExpeptionHandling(ex, retry, currentDelay)
-        case ex: IOException =>
-          retriableExpeptionHandling(ex, retry, currentDelay)
-        case ex: AkkaException =>
-          retriableExpeptionHandling(ex, retry, currentDelay)        
         case ex: StreamTcpException =>
           retriableExpeptionHandling(ex, retry, currentDelay)
         case ex =>
-          logging(s"Non retriable error thrown ${ex.getMessage} type: ${ex.getClass}", Some(ex))
           Task.raiseError(ex)
       }
 
@@ -85,10 +65,8 @@ object RetryOps {
       * @param strategy   the implicitly available retry strategy between retry delays
       * @return an optional Json which contains only the filtered shape.
       */
-    def retry(maxRetries: Int, logging: (String, Option[Throwable]) => Unit)(
-      implicit strategy: RetryStrategy
-    ): Future[A] =
-      RetryOps.retry(source, maxRetries, strategy, logging)
+    def retry(maxRetries: Int)(implicit strategy: RetryStrategy): Future[A] =
+      RetryOps.retry(source, maxRetries, strategy)
   }
 }
 

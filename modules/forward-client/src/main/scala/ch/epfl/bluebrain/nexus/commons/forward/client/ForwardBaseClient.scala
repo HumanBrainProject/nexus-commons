@@ -24,10 +24,8 @@ abstract class ForwardBaseClient[F[_]](
   private[client] def execute(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => String): F[Unit] =
     executeWith(req, expectedCodes, Some(intent))
 
-  private def executeWith(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => Option[String]): F[Unit] = {
-    log.info(s"EXECUTE WITH - request: ${req.toString()}")
+  private def executeWith(req: HttpRequest, expectedCodes: Set[StatusCode], intent: => Option[String]): F[Unit] =
     cl(req).discardOnCodesOr(expectedCodes) { resp =>
-      log.info(s"EXECUTE INNER - response: ${resp.toString()}")
       ForwardFailure.fromResponse(resp).flatMap { f =>
         val _ = intent.map(
           msg =>
@@ -38,7 +36,6 @@ abstract class ForwardBaseClient[F[_]](
         F.raiseError(f)
       }
     }
-  }
 }
 
 object ForwardBaseClient {}

@@ -6,8 +6,6 @@ import cats.MonadError
 import cats.syntax.functor._
 import ch.epfl.bluebrain.nexus.commons.http.HttpClient.UntypedHttpClient
 import ch.epfl.bluebrain.nexus.commons.types.{Err, RetriableErr}
-import journal.Logger
-import org.slf4j.LoggerFactory
 
 @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
 trait ForwardFailure extends Err {
@@ -20,8 +18,6 @@ trait ForwardFailure extends Err {
 
 @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
 object ForwardFailure {
-  private[commons] val log = LoggerFactory.getLogger(this.getClass)
-  private[commons] val logger = Logger[this.type]
 
   /**
     * Generates a Forward failure from the HTTP response .
@@ -30,12 +26,8 @@ object ForwardFailure {
     */
   def fromResponse[F[_]](
     r: HttpResponse
-  )(implicit cl: UntypedHttpClient[F], F: MonadError[F, Throwable]): F[ForwardFailure] = {
-    log.info(s"Forward failure response info - ${r.toString()}")
-    logger.info(s"Forward failure response info with different logger - ${r.toString()}")
-    cl.akkaLogger.info(s"Forward failure response info with akka logger - ${r.toString()}")
+  )(implicit cl: UntypedHttpClient[F], F: MonadError[F, Throwable]): F[ForwardFailure] =
     cl.toString(r.entity).map(body => fromStatusCode(r.status, body))
-  }
 
   /**
     * Generates a Forward server failure from the HTTP response status ''code''.

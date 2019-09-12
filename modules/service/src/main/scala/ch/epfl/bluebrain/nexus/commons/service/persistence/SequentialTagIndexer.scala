@@ -80,24 +80,14 @@ object SequentialTagIndexer {
     id: String
   )(implicit as: ActorSystem, E: Encoder[T]): Flow[(Offset, String, T), Offset, NotUsed] = {
     import as.dispatcher
-    val log = Logging(as, SequentialTagIndexer.getClass)
-    log.debug("Logging inside toFlow")
-    def logging(s: String, error: Option[Throwable]): Unit = error match {
-      case Some(e) =>
-        log.error(s, e)
-      case None => log.info(s)
-    }
+
     implicit val (retries, backoff) = lookupRetriesConfig
     val failureLog = IndexFailuresLog(id)
     Flow[(Offset, String, T)].mapAsync(1) {
       case (off, persistenceId, el) =>
         (() => index(el))
-          .retry(retries, logging)
-          .recoverWith {
-            case e =>
-              log.error(s"Could not recover ${el.toString}", e)
-              failureLog.storeEvent(persistenceId, off, el)
-          }
+          .retry(retries)
+          .recoverWith { case _ => failureLog.storeEvent(persistenceId, off, el) }
           .map(_ => off)
     }
   }
